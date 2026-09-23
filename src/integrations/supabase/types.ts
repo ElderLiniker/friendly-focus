@@ -14,7 +14,387 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      generated_images: {
+        Row: {
+          created_at: string
+          id: string
+          influencer_id: string | null
+          kind: string
+          owner_id: string | null
+          project_id: string | null
+          prompt: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          influencer_id?: string | null
+          kind: string
+          owner_id?: string | null
+          project_id?: string | null
+          prompt?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          influencer_id?: string | null
+          kind?: string
+          owner_id?: string | null
+          project_id?: string | null
+          prompt?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_images_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_images_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      generations: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          error: string | null
+          id: string
+          model: string | null
+          owner_id: string | null
+          project_id: string | null
+          status: string
+          task: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          model?: string | null
+          owner_id?: string | null
+          project_id?: string | null
+          status: string
+          task: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          model?: string | null
+          owner_id?: string | null
+          project_id?: string | null
+          status?: string
+          task?: string
+        }
+        Relationships: []
+      }
+      hook_categories: {
+        Row: {
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      hooks: {
+        Row: {
+          category_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_favorite: boolean
+          notes: string | null
+          owner_id: string | null
+          source: string
+          template: string
+          usage_count: number
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_favorite?: boolean
+          notes?: string | null
+          owner_id?: string | null
+          source?: string
+          template: string
+          usage_count?: number
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_favorite?: boolean
+          notes?: string | null
+          owner_id?: string | null
+          source?: string
+          template?: string
+          usage_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hooks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "hook_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      influencers: {
+        Row: {
+          age_range: string | null
+          appearance: Json
+          created_at: string
+          description: string | null
+          gender: string | null
+          id: string
+          identity: string | null
+          name: string
+          niche: string | null
+          owner_id: string | null
+          reference_image_urls: string[]
+          style: string | null
+          updated_at: string
+          visual_traits: string | null
+        }
+        Insert: {
+          age_range?: string | null
+          appearance?: Json
+          created_at?: string
+          description?: string | null
+          gender?: string | null
+          id?: string
+          identity?: string | null
+          name: string
+          niche?: string | null
+          owner_id?: string | null
+          reference_image_urls?: string[]
+          style?: string | null
+          updated_at?: string
+          visual_traits?: string | null
+        }
+        Update: {
+          age_range?: string | null
+          appearance?: Json
+          created_at?: string
+          description?: string | null
+          gender?: string | null
+          id?: string
+          identity?: string | null
+          name?: string
+          niche?: string | null
+          owner_id?: string | null
+          reference_image_urls?: string[]
+          style?: string | null
+          updated_at?: string
+          visual_traits?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          analysis: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          image_urls: string[]
+          link: string | null
+          name: string | null
+          owner_id: string | null
+          page_extract: string | null
+          updated_at: string
+        }
+        Insert: {
+          analysis?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_urls?: string[]
+          link?: string | null
+          name?: string | null
+          owner_id?: string | null
+          page_extract?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analysis?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_urls?: string[]
+          link?: string | null
+          name?: string | null
+          owner_id?: string | null
+          page_extract?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          auth_user_id: string | null
+          created_at: string
+          credits_balance: number | null
+          display_name: string | null
+          id: string
+          plan: string
+        }
+        Insert: {
+          auth_user_id?: string | null
+          created_at?: string
+          credits_balance?: number | null
+          display_name?: string | null
+          id?: string
+          plan?: string
+        }
+        Update: {
+          auth_user_id?: string | null
+          created_at?: string
+          credits_balance?: number | null
+          display_name?: string | null
+          id?: string
+          plan?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          auto_mode: boolean
+          caption: string | null
+          created_at: string
+          cta: string | null
+          current_step: string
+          hashtags: string[]
+          hook: Json | null
+          id: string
+          influencer_id: string | null
+          owner_id: string | null
+          parent_project_id: string | null
+          product_id: string | null
+          scenes: Json
+          script: Json | null
+          settings: Json
+          status: string
+          strategy: Json | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          auto_mode?: boolean
+          caption?: string | null
+          created_at?: string
+          cta?: string | null
+          current_step?: string
+          hashtags?: string[]
+          hook?: Json | null
+          id?: string
+          influencer_id?: string | null
+          owner_id?: string | null
+          parent_project_id?: string | null
+          product_id?: string | null
+          scenes?: Json
+          script?: Json | null
+          settings?: Json
+          status?: string
+          strategy?: Json | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          auto_mode?: boolean
+          caption?: string | null
+          created_at?: string
+          cta?: string | null
+          current_step?: string
+          hashtags?: string[]
+          hook?: Json | null
+          id?: string
+          influencer_id?: string | null
+          owner_id?: string | null
+          parent_project_id?: string | null
+          product_id?: string | null
+          scenes?: Json
+          script?: Json | null
+          settings?: Json
+          status?: string
+          strategy?: Json | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_influencer_id_fkey"
+            columns: ["influencer_id"]
+            isOneToOne: false
+            referencedRelation: "influencers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_parent_project_id_fkey"
+            columns: ["parent_project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
