@@ -1,10 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { Copy, ExternalLink, FolderKanban, Loader2, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, FolderKanban, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { listProjects, duplicateProject, deleteProject } from "@/lib/projects.functions";
+import { listProjects, duplicateProject, reuseProject, newVersionProject, deleteProject } from "@/lib/projects.functions";
 
 export const Route = createFileRoute("/projetos")({ component: ProjectsPage });
 
@@ -13,6 +13,8 @@ function ProjectsPage() {
   const qc = useQueryClient();
   const nav = useNavigate();
   const duplicate = useServerFn(duplicateProject);
+  const reuse = useServerFn(reuseProject);
+  const version = useServerFn(newVersionProject);
   const remove = useServerFn(deleteProject);
 
   async function runDuplicate(id: string) {
@@ -21,6 +23,20 @@ function ProjectsPage() {
       await qc.invalidateQueries({ queryKey: ["projects"] });
       nav({ to: "/projeto/$id", params: { id: r.id } });
     } catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível duplicar."); }
+  }
+  async function runReuse(id: string) {
+    try {
+      const r = await reuse({ data: { id } });
+      await qc.invalidateQueries({ queryKey: ["projects"] });
+      nav({ to: "/projeto/$id", params: { id: r.id } });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível reutilizar."); }
+  }
+  async function runVersion(id: string) {
+    try {
+      const r = await version({ data: { id } });
+      await qc.invalidateQueries({ queryKey: ["projects"] });
+      nav({ to: "/projeto/$id", params: { id: r.id } });
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Não foi possível criar a nova versão."); }
   }
   async function runDelete(id: string) {
     if (!window.confirm("Excluir este projeto? Esta ação não pode ser desfeita.")) return;
@@ -52,6 +68,8 @@ function ProjectsPage() {
             <div className="flex items-center gap-2 text-xs text-muted-foreground"><span>{p.status}</span><span>·</span><span>{p.sceneCount} cenas</span>{p.isVariation && <><span>·</span><span>variação</span></>}</div>
             <div className="flex gap-2">
               <Button asChild size="sm" className="flex-1"><Link to="/projeto/$id" params={{ id: p.id }}><ExternalLink className="h-3.5 w-3.5" /> Abrir</Link></Button>
+              <Button size="sm" variant="outline" title="Reutilizar produto e configurações" onClick={() => runReuse(p.id)}>Reutilizar</Button>
+              <Button size="sm" variant="outline" title="Nova versão" onClick={() => runVersion(p.id)}>Nova versão</Button>
               <Button size="sm" variant="outline" title="Duplicar" onClick={() => runDuplicate(p.id)}><Copy className="h-3.5 w-3.5" /></Button>
               <Button size="sm" variant="outline" title="Excluir" onClick={() => runDelete(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
             </div>
