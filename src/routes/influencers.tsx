@@ -1,0 +1,29 @@
+import { useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Copy, Loader2, Plus, RefreshCw, Trash2, UserRound, Wand2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { listInfluencers, generateInfluencerOptions, saveInfluencer, duplicateInfluencer, deleteInfluencer, updateInfluencer, regenerateInfluencerPortrait } from "@/lib/influencers.functions";
+
+export const Route = createFileRoute("/influencers")({ component: InfluencersPage });
+
+function InfluencersPage() {
+ const q=useQuery({queryKey:["influencers"],queryFn:()=>listInfluencers()}); const qc=useQueryClient();
+ const gen=useServerFn(generateInfluencerOptions); const save=useServerFn(saveInfluencer); const dup=useServerFn(duplicateInfluencer); const del=useServerFn(deleteInfluencer); const upd=useServerFn(updateInfluencer); const regen=useServerFn(regenerateInfluencerPortrait);
+ const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false); const [gender,setGender]=useState("Mulher"); const [age,setAge]=useState("25–35"); const [style,setStyle]=useState("UGC natural"); const [niche,setNiche]=useState("TikTok Shop"); const [traits,setTraits]=useState(""); const [options,setOptions]=useState<any[]>([]); const [selected,setSelected]=useState<any|null>(null);
+ async function generate(){setBusy(true);try{const r=await gen({data:{gender,age,style,niche,hair:"",look:"",clothes:"",accessories:"",traits}});setOptions(r);setSelected(r[0]??null);}catch(e){toast.error(e instanceof Error?e.message:"Falha ao gerar.");}finally{setBusy(false)}}
+ async function create(){if(!selected)return;setBusy(true);try{await save({data:{config:{gender,age,style,niche,hair:"",look:"",clothes:"",accessories:"",traits},option:selected,generateImage:true}});await qc.invalidateQueries({queryKey:["influencers"]});setOpen(false);setOptions([]);setSelected(null);toast.success("Influencer salvo.");}catch(e){toast.error(e instanceof Error?e.message:"Falha ao salvar.");}finally{setBusy(false)}}
+ async function action(fn:()=>Promise<any>,msg:string){try{await fn();await qc.invalidateQueries({queryKey:["influencers"]});toast.success(msg)}catch(e){toast.error(e instanceof Error?e.message:"Ação falhou.")}}
+ return <div className="space-y-6">
+  <header className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm text-muted-foreground">Identidade visual</p><h1 className="text-3xl font-extrabold">Meus influencers</h1><p className="mt-1 text-muted-foreground">Crie personagens reutilizáveis para manter consistência.</p></div><Button onClick={()=>setOpen(v=>!v)}><Plus className="h-4 w-4"/> Novo influencer</Button></header>
+  {open&&<section className="space-y-4 rounded-3xl border bg-card p-5"><h2 className="font-bold">Criar influencer com IA</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><div><Label>Gênero</Label><Input value={gender} onChange={e=>setGender(e.target.value)}/></div><div><Label>Idade</Label><Input value={age} onChange={e=>setAge(e.target.value)}/></div><div><Label>Estilo</Label><Input value={style} onChange={e=>setStyle(e.target.value)}/></div><div><Label>Nicho</Label><Input value={niche} onChange={e=>setNiche(e.target.value)}/></div></div><div><Label>Características visuais</Label><Textarea value={traits} onChange={e=>setTraits(e.target.value)} placeholder="Ex.: cabelo, traços, aparência, etc."/></div><div className="flex gap-2"><Button onClick={generate} disabled={busy}><Wand2 className="h-4 w-4"/> Gerar opções</Button><Button variant="ghost" onClick={()=>setOpen(false)}>Cancelar</Button></div>
+  {options.length>0&&<div className="grid gap-3 md:grid-cols-3">{options.map((o,i)=><button key={i} onClick={()=>setSelected(o)} className={`rounded-2xl border p-4 text-left ${selected===o?"border-primary bg-primary/10":""}`}><b>{o.name}</b><p className="mt-1 text-sm text-muted-foreground">{o.description}</p><p className="mt-2 text-xs">{o.visual_traits}</p></button>)}</div>}
+  {selected&&<Button onClick={create} disabled={busy}>Salvar influencer e gerar retrato</Button>}</section>}
+  {q.isLoading?<Loader2 className="h-7 w-7 animate-spin"/>:<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(q.data??[]).map(i=><article key={i.id} className="overflow-hidden rounded-2xl border bg-card">{i.image_signed[0]?<img src={i.image_signed[0]} alt={i.name} className="h-64 w-full object-cover"/>:<div className="grid h-64 place-items-center bg-secondary"><UserRound className="h-12 w-12"/></div>}<div className="space-y-3 p-4"><div><h2 className="font-semibold">{i.name}</h2><p className="text-sm text-muted-foreground">{i.style} · {i.niche}</p></div><p className="line-clamp-3 text-sm text-muted-foreground">{i.visual_traits||i.description}</p><div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={()=>action(()=>regen({data:{id:i.id}}),"Retrato regenerado")}><RefreshCw className="h-3.5 w-3.5"/></Button><Button size="sm" variant="outline" onClick={()=>action(()=>dup({data:{id:i.id}}),"Influencer duplicado")}><Copy className="h-3.5 w-3.5"/></Button><Button size="sm" variant="destructive" onClick={()=>action(()=>del({data:{id:i.id}}),"Influencer excluído")}><Trash2 className="h-3.5 w-3.5"/></Button></div></div></article>)}</div>}
+ </div>;
+}
