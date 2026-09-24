@@ -1,13 +1,11 @@
-// Camada de IA do TikPrompt. Toda chamada de IA passa por aqui.
-// - Gemini (via Lovable AI) é o provedor principal.
-// - Para adicionar um provedor de fallback no futuro, implemente outro `TextProvider`
-//   e adicione-o em `textProviders` — o resto do sistema não precisa mudar.
-// - Cada chamada é registrada na tabela `generations` (base para créditos/limites na fase 2).
+// Camada de IA do TikPrompt.
+// Provedor principal: Google Gemini usando GEMINI_API_KEY.
+// A chave fica somente no servidor (Vercel), nunca no navegador.
 import { getDb } from "../db.server";
 
-const GATEWAY = "https://ai.gateway.lovable.dev/v1";
-export const TEXT_MODEL = "google/gemini-3.8-flash";
-export const IMAGE_MODEL = "google/gemini-3.1-flash-image";
+const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
+export const TEXT_MODEL = "gemini-2.5-flash";
+export const IMAGE_MODEL = "gemini-2.5-flash-image";
 
 export class AIError extends Error {
   status: number;
@@ -18,14 +16,13 @@ export class AIError extends Error {
 }
 
 function apiKey() {
-  const key = process.env["LOVABLE_API_KEY"];
-  if (!key) throw new AIError("A IA não está configurada no servidor (LOVABLE_API_KEY ausente).", 500);
+  const key = process.env["GEMINI_API_KEY"];
+  if (!key) throw new AIError("A IA não está configurada no servidor (GEMINI_API_KEY ausente).", 500);
   return key;
 }
 
 function friendly(status: number, body: string): AIError {
   if (status === 429) return new AIError("Muitas solicitações à IA agora. Aguarde alguns segundos e tente de novo.", 429);
-  if (status === 402) return new AIError("Os créditos de IA do workspace acabaram. Adicione créditos para continuar.", 402);
   if (status === 403) return new AIError("A IA recusou esta solicitação (acesso negado).", 403);
   if (status === 400) return new AIError("A IA não aceitou a solicitação (dados inválidos ou imagem não suportada).", 400);
   return new AIError(`Falha na IA (${status}). ${body.slice(0, 160)}`, status);
@@ -54,42 +51,70 @@ type TextProvider = {
   json: (system: string, user: string, images: ImagePart[]) => Promise<string>;
 };
 
+async function imageToInlineData(image: ImagePart): Promise<any> {
+  if (image.url.startsWith("data:")) {
+    const match = image.url.match(/^data:([^;,]+);base64,(.+)$/s);
+    if (!match) throw new AIError("Imagem de referência inválida.", 400);
+    return { inlineData: { mimeType: match[1], data: match[2] } };
+  }
+
+  const response = await fetch(image.url);
+  if (!response.ok) throw new AIError("Não foi possível carregar a imagem de referência.", 400);
+  const mimeType = response.headers.get("content-type")?.split(";")[0] || "image/jpeg";
+  if (!mimeType.startsWith("image/")) throw new AIError("A referência fornecida não é uma imagem válida.", 400);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return { inlineData: { mimeType, data: Buffer.from(binary, "binary").toString("base64") } };
+}
+
+async function geminiGenerateContent(opts: {
+  model: string;
+  system?: string;
+  parts: any[];
+  responseMimeType?: string;
+}) {
+  const res = await fetch(
+    `${GEMINI_API_BASE}/models/${opts.model}:generateContent?key=${encodeURIComponent(apiKey())}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: opts.system ? { parts: [{ text: opts.system }] } : undefined,
+        contents: [{ role: "user", parts: opts.parts }],
+        generationConfig: opts.responseMimeType ? { responseMimeType: opts.responseMimeType } : undefined,
+      }),
+    },
+  );
+  const text = await res.text();
+  if (!res.ok) throw friendly(res.status, text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new AIError("O Gemini retornou uma resposta inválida.", 502);
+  }
+}
+
 const geminiProvider: TextProvider = {
-  name: "lovable-gemini",
+  name: "google-gemini",
   model: TEXT_MODEL,
   async json(system, user, images) {
-    const content = images.length
-      ? [
-          { type: "text", text: user },
-          ...images.map((i) => ({ type: "image_url", image_url: { url: i.url } })),
-        ]
-      : user;
-    const res = await fetch(`${GATEWAY}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey()}`,
-        "Content-Type": "application/json",
-        "X-Lovable-AIG-SDK": "fetch",
-      },
-      body: JSON.stringify({
-        model: TEXT_MODEL,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content },
-        ],
-        response_format: { type: "json_object" },
-      }),
+    const imageParts = await Promise.all(images.map(imageToInlineData));
+    const data = await geminiGenerateContent({
+      model: TEXT_MODEL,
+      system,
+      parts: [{ text: user }, ...imageParts],
+      responseMimeType: "application/json",
     });
-    const text = await res.text();
-    if (!res.ok) throw friendly(res.status, text);
-    const data = JSON.parse(text);
-    const out = data?.choices?.[0]?.message?.content;
-    if (!out || typeof out !== "string") throw new AIError("A IA retornou uma resposta vazia.", 502);
+    const parts = data?.candidates?.[0]?.content?.parts;
+    const out = Array.isArray(parts) ? parts.map((part: any) => part?.text).filter(Boolean).join("") : "";
+    if (!out) throw new AIError("A IA retornou uma resposta vazia.", 502);
     return out;
   },
 };
 
-// Ordem de tentativa. Adicione aqui um segundo provedor (fallback) na fase 2.
 const textProviders: TextProvider[] = [geminiProvider];
 
 function parseJSON<T>(raw: string): T {
@@ -133,7 +158,7 @@ export async function aiJSON<T>(opts: {
         project_id: opts.projectId ?? null,
       });
       // Erros terminais não passam para o próximo provedor
-      if (e instanceof AIError && [402, 403].includes(e.status)) throw e;
+      if (e instanceof AIError && [403].includes(e.status)) throw e;
     }
   }
   if (lastErr instanceof Error) throw lastErr;
@@ -149,26 +174,19 @@ export async function aiImage(opts: {
 }): Promise<{ base64: string; mime: string }> {
   const t0 = Date.now();
   try {
-    const content = [
-      { type: "text", text: opts.prompt },
-      ...(opts.references ?? []).map((r) => ({ type: "image_url", image_url: { url: r.url } })),
-    ];
-    const res = await fetch(`${GATEWAY}/images/generations`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: IMAGE_MODEL,
-        messages: [{ role: "user", content }],
-        modalities: ["image", "text"],
-      }),
+    const referenceParts = await Promise.all((opts.references ?? []).map(imageToInlineData));
+    const data = await geminiGenerateContent({
+      model: IMAGE_MODEL,
+      parts: [{ text: opts.prompt }, ...referenceParts],
     });
-    const text = await res.text();
-    if (!res.ok) throw friendly(res.status, text);
-    const data = JSON.parse(text);
-    const b64: string | undefined = data?.data?.[0]?.b64_json;
-    if (!b64) throw new AIError("A IA não retornou nenhuma imagem. Tente ajustar e gerar novamente.", 502);
+    const parts = data?.candidates?.[0]?.content?.parts;
+    const imagePart = Array.isArray(parts) ? parts.find((part: any) => part?.inlineData?.data) : null;
+    if (!imagePart?.inlineData?.data) {
+      throw new AIError("A IA não retornou nenhuma imagem. Tente ajustar e gerar novamente.", 502);
+    }
+    const mime = imagePart.inlineData.mimeType || "image/png";
     await logGeneration({ task: opts.task, model: IMAGE_MODEL, status: "success", duration_ms: Date.now() - t0, project_id: opts.projectId ?? null });
-    return { base64: b64, mime: "image/png" };
+    return { base64: imagePart.inlineData.data, mime };
   } catch (e) {
     await logGeneration({
       task: opts.task,
