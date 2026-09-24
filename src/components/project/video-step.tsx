@@ -11,7 +11,7 @@ export function VideoStep({ d, onDone }: { d: PData; onDone: () => void }) {
   const { save, refresh } = useProjectActions(d.project.id);
   const { run } = useRun();
   const pipe = usePipeline(d.project.id);
-  const [s, setS] = useState({ ...v.settings, sceneCount: v.settings.sceneCount ?? 3, duration: v.settings.duration ?? 15, destination: v.settings.destination ?? "flow" });
+  const [s, setS] = useState({ ...v.settings, sceneCount: v.settings.sceneCount ?? 3, duration: v.settings.duration ?? 10, destination: v.settings.destination ?? "flow" });
 
   const go = () =>
     run("g", async () => {
