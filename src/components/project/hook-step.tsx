@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Sparkles, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { listHookLibrary } from "@/lib/hooks.functions";
+import { listHookLibrary, markHookUsed } from "@/lib/hooks.functions";
 import { generateHooks } from "@/lib/generate.functions";
 import type { Hook } from "@/lib/constants";
 import { Chip, Section, Spin, useProjectActions, useRun, view, type PData } from "./shared";
@@ -18,6 +18,7 @@ export function HookStep({ d, onNext }: { d: PData; onNext: () => void }) {
   const [cat, setCat] = useState<string>("");
   const [options, setOptions] = useState<Hook[]>([]);
   const [chosen, setChosen] = useState<Hook | null>(hook);
+  const [libraryHookId, setLibraryHookId] = useState<string | null>(null);
 
   const catName = lib.data?.categories.find((c) => c.id === cat)?.name;
   const hooks = useMemo(
@@ -34,6 +35,7 @@ export function HookStep({ d, onNext }: { d: PData; onNext: () => void }) {
   const proceed = (h: Hook | null) =>
     run("save", async () => {
       await save({ hook: h, current_step: "influencer" });
+      if (h && libraryHookId) await markHookUsed({ data: { id: libraryHookId } });
       onNext();
     });
 
@@ -81,7 +83,7 @@ export function HookStep({ d, onNext }: { d: PData; onNext: () => void }) {
               key={h.id}
               type="button"
               disabled={busy === "gen"}
-              onClick={() => generate({ template: h.template })}
+              onClick={() => { setLibraryHookId(h.id); generate({ template: h.template }); }}
               className="flex items-start gap-2 rounded-xl border border-border p-3 text-left text-sm hover:border-primary"
               title="Adaptar ao produto"
             >
