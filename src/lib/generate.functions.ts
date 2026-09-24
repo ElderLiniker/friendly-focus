@@ -47,6 +47,20 @@ function label(list: readonly { id: string; label: string }[], id?: string) {
   return list.find((o) => o.id === id)?.label ?? "IA escolhe automaticamente";
 }
 
+async function referenceImages(c: Ctx) {
+  const refs: { url: string }[] = [];
+  const { toDataUrl } = await import("./db.server");
+  for (const path of (c.product?.image_urls ?? []).slice(0, 3)) {
+    const url = await toDataUrl(path);
+    if (url) refs.push({ url });
+  }
+  if (c.influencer?.reference_image_urls?.[0]) {
+    const url = await toDataUrl(c.influencer.reference_image_urls[0]);
+    if (url) refs.push({ url });
+  }
+  return refs;
+}
+
 function briefing(c: Ctx) {
   const s = c.settings;
   const inf = c.influencer;
@@ -137,7 +151,10 @@ async function enforceLimit(c: Ctx, scenes: Scene[], max: number | null): Promis
       user: s.prompt,
       validate: (v) => (nonEmpty(v.prompt) ? null : "prompt"),
     });
-    out.push({ ...s, prompt: r.prompt.length <= max ? r.prompt : r.prompt.slice(0, max) });
+    if (r.prompt.length > max) {
+      throw new Error("A IA não conseguiu manter a cena " + s.index + " dentro do limite de " + max + " caracteres. Gere novamente.");
+    }
+    out.push({ ...s, prompt: r.prompt });
   }
   return out;
 }
@@ -154,11 +171,16 @@ async function buildScenes(c: Ctx, onlyIndex?: number): Promise<Scene[]> {
     onlyIndex !== undefined
       ? `Regenere APENAS a cena ${onlyIndex} (duração ${durs[onlyIndex - 1]}s), mantendo continuidade com as outras cenas abaixo. Retorne scenes com 1 item.\nCENAS ATUAIS:\n${existing.map((s) => `Cena ${s.index}: ${s.prompt}`).join("\n")}`
       : `Divida o roteiro em ${n} cena(s) com durações exatas: ${durs.map((d, i) => `cena ${i + 1} = ${d}s`).join(", ")}.`;
+  const refs = await referenceImages(c);
+  const referenceNote = refs.length
+    ? "REFERÊNCIAS VISUAIS ANEXADAS: as primeiras imagens são do PRODUTO REAL e, quando houver, a última é a referência visual do INFLUENCER. Preserve fielmente identidade, formato, cores, embalagem, rótulos, textura e proporções. Não substitua o produto por outro."
+    : "NÃO HÁ FOTO DE REFERÊNCIA DISPONÍVEL: não invente detalhes visuais do produto além do que está confirmado na análise.";
   const out = await aiJSON<{ scenes: Scene[] }>({
     task: onlyIndex ? "regenerate_scene" : "scenes",
     projectId: c.project.id,
     system: scenesSystem(max),
-    user: `${briefing(c)}\n\nROTEIRO:\nGancho: ${script.hook}\nDesenvolvimento: ${script.development}\nDemonstração: ${script.demonstration}\nBenefício: ${script.benefit}\nCTA: ${script.cta}\n\n${ask}`,
+    images: refs,
+    user: `${briefing(c)}\n\n${referenceNote}\n\nROTEIRO:\nGancho: ${script.hook}\nDesenvolvimento: ${script.development}\nDemonstração: ${script.demonstration}\nBenefício: ${script.benefit}\nCTA: ${script.cta}\n\n${ask}`,
     validate: (v) => (Array.isArray(v.scenes) && v.scenes.length && v.scenes.every((s) => nonEmpty(s.prompt)) ? null : "cenas"),
   });
   let scenes = out.scenes.map((s, i) => ({
