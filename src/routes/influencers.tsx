@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listInfluencers, generateInfluencerOptions, saveInfluencer, duplicateInfluencer, deleteInfluencer, updateInfluencer, regenerateInfluencerPortrait } from "@/lib/influencers.functions";
 
-export const Route = createFileRoute("/influencers")({ component: InfluencersPage });
+export const Route = createFileRoute("/influencers")({\n validateSearch: z.object({ novo: z.boolean().optional(), voltar: z.string().uuid().optional() }),\n component: InfluencersPage,\n});
 
 function InfluencersPage() {
  const q=useQuery({queryKey:["influencers"],queryFn:()=>listInfluencers()}); const qc=useQueryClient();
