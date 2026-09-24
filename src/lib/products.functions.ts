@@ -90,6 +90,7 @@ function validAnalysis(a: ProductAnalysis) {
 async function runAnalysis(input: { link?: string; description?: string; imagePaths: string[] }) {
   let pageText = "";
   const images: { url: string }[] = [];
+  const persistedImagePaths = [...input.imagePaths];
   let pageWarning: string | null = null;
   if (input.link) {
     try {
@@ -97,7 +98,18 @@ async function runAnalysis(input: { link?: string; description?: string; imagePa
       pageText = page.text;
       if (page.image && input.imagePaths.length === 0) {
         const d = await toDataUrl(page.image);
-        if (d) images.push({ url: d });
+        if (d) {
+          images.push({ url: d });
+          const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(d);
+          if (match && ALLOWED.includes(match[1].toLowerCase())) {
+            try {
+              const savedPath = await uploadBase64(match[2], match[1].toLowerCase(), "uploads");
+              persistedImagePaths.push(savedPath);
+            } catch {
+              // A análise ainda pode continuar usando a imagem remota; persistência é best-effort.
+            }
+          }
+        }
       }
     } catch (e) {
       pageWarning = e instanceof Error ? e.message : "Falha ao ler o link.";
@@ -119,14 +131,14 @@ async function runAnalysis(input: { link?: string; description?: string; imagePa
     .join("\n\n");
   const analysis = await aiJSON<ProductAnalysis>({ task: "analyze_product", system: ANALYZE_SYSTEM, user, images, validate: validAnalysis });
   if (pageWarning) analysis.unknown = [`Aviso: ${pageWarning}`, ...analysis.unknown];
-  return { analysis, pageText };
+  return { analysis, pageText, imagePaths: persistedImagePaths };
 }
 
 export const analyzeProduct = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => AnalyzeInput.parse(d))
   .handler(async ({ data }) => {
     const link = data.link || undefined;
-    const { analysis, pageText } = await runAnalysis({ link, description: data.description, imagePaths: data.imagePaths });
+    const { analysis, pageText, imagePaths } = await runAnalysis({ link, description: data.description, imagePaths: data.imagePaths });
     if (analysis.sufficient === false && !analysis.name) {
       throw new Error("Não há informações suficientes para identificar o produto. Adicione uma imagem ou descrição.");
     }
@@ -137,7 +149,7 @@ export const analyzeProduct = createServerFn({ method: "POST" })
         name: analysis.name || "Produto",
         link: link ?? null,
         description: data.description ?? null,
-        image_urls: data.imagePaths,
+        image_urls: imagePaths,
         page_extract: pageText || null,
         analysis: analysis as never,
       })
@@ -213,10 +225,10 @@ export const reanalyzeProduct = createServerFn({ method: "POST" })
     const { data: p, error } = await db.from("products").select("*").eq("id", data.productId).single();
     if (error || !p) throw new Error("Produto não encontrado.");
     const description = data.description ?? p.description ?? undefined;
-    const { analysis } = await runAnalysis({ link: p.link ?? undefined, description, imagePaths: p.image_urls });
+    const { analysis, imagePaths } = await runAnalysis({ link: p.link ?? undefined, description, imagePaths: p.image_urls });
     await db
       .from("products")
-      .update({ analysis: analysis as never, name: analysis.name, description: description ?? null, updated_at: new Date().toISOString() })
+      .update({ analysis: analysis as never, name: analysis.name, description: description ?? null, image_urls: imagePaths, updated_at: new Date().toISOString() })
       .eq("id", p.id);
     return { ok: true };
   });
