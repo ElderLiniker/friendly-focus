@@ -156,7 +156,7 @@ export const analyzeProduct = createServerFn({ method: "POST" })
       .select()
       .single();
     if (error) throw new Error(error.message);
-    const settings: ProjectSettings = { duration: 15, sceneCount: 3, style: "auto", tone: "Natural", destination: "flow" };
+    const settings: ProjectSettings = { duration: 10, sceneCount: 3, style: "auto", tone: "Natural", destination: "flow" };
     let hook = null;
     if (data.hookId) {
       const { data: h } = await db.from("hooks").select("template, hook_categories(name)").eq("id", data.hookId).single();
