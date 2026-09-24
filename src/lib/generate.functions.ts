@@ -162,7 +162,7 @@ async function enforceLimit(c: Ctx, scenes: Scene[], max: number | null): Promis
 async function buildScenes(c: Ctx, onlyIndex?: number): Promise<Scene[]> {
   const script = c.project.script as Script | null;
   if (!script) throw new Error("Gere o roteiro antes das cenas.");
-  const total = c.settings.duration ?? 15;
+  const total = c.settings.duration ?? 10;
   const n = c.settings.sceneCount ?? 3;
   const durs = sceneDurations(total, n);
   const max = (c.settings.destination ?? "flow") === "flow" ? MAX_PROMPT_CHARS : null;
