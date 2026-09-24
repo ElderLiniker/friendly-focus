@@ -69,7 +69,7 @@ function briefing(c: Ctx) {
 CONFIGURAÇÕES:
 Formato: ${label(CREATION_FORMATS, s.format)}
 Objetivo: ${label(OBJECTIVES, s.objective)}
-Duração total: ${s.duration ?? 15} segundos
+Duração total: ${s.duration ?? 10} segundos
 Estilo: ${!s.style || s.style === "auto" ? "IA recomenda" : s.style}
 Tom: ${s.tone ?? "Natural"}
 ${inf ? `INFLUENCER (manter identidade): ${inf.name} — ${inf.identity ?? ""}. Aparência fixa: ${inf.visual_traits ?? inf.description ?? ""}` : "Influencer: nenhum definido (pode ser mãos/POV ou pessoa genérica descrita de forma consistente)."}`;
