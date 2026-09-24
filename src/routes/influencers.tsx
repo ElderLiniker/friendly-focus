@@ -11,7 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { listInfluencers, generateInfluencerOptions, saveInfluencer, duplicateInfluencer, deleteInfluencer, updateInfluencer, regenerateInfluencerPortrait } from "@/lib/influencers.functions";
 
-export const Route = createFileRoute("/influencers")({\n validateSearch: z.object({ novo: z.boolean().optional(), voltar: z.string().uuid().optional() }),\n component: InfluencersPage,\n});
+export const Route = createFileRoute("/influencers")({
+  validateSearch: z.object({ novo: z.boolean().optional(), voltar: z.string().uuid().optional() }),
+  component: InfluencersPage,
+});
 
 function InfluencersPage() {
  const q=useQuery({queryKey:["influencers"],queryFn:()=>listInfluencers()}); const qc=useQueryClient();
